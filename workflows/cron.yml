@@ -1,1 +1,48 @@
+name: Execució Diària eBando Espluga
 
+on:
+  schedule:
+    - cron: '0 9 * * *'  # S'executa automàticament cada dia a les 09:00 UTC
+  workflow_dispatch:     # Activa el botó per provar-ho manualment a la web de GitHub
+
+permissions:
+  contents: write        # Permís obligatori per guardar les noves notícies al JSON
+  pages: write           # Permís per poder publicar la pàgina web gratis
+  id-token: write
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar el codi del repositori
+        uses: actions/checkout@v4
+
+      - name: Configurar entorn Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instal·lar llibreria Feedparser
+        run: pip install feedparser
+
+      - name: Executar l'agent de l'eBando
+        run: python agent.py
+
+      - name: Guardar canvis del JSON al repositori
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add noticies.json || true
+          git commit -m "Actualització automàtica de bandos (JSON)" || true
+          git push || true
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Preparar fitxers per a la web
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'      # Puja l'index.html i el noticies.json a la teva adreça pública
+
+      - name: Publicar la pàgina web a Internet
+        uses: actions/deploy-pages@v4
