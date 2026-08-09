@@ -3,65 +3,477 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bandos Oficials de l'Espluga de Francolí</title>
+    <title>Actualitat Municipal - Esplugues de Francolí</title>
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f7fa; color: #333; }
-        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
-        .bando-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border-left: 5px solid #3498db; }
-        .bando-title { font-size: 20px; font-weight: bold; color: #2c3e50; margin: 0 0 10px 0; }
-        .bando-date { font-size: 13px; color: #7f8c8d; margin-bottom: 15px; font-style: italic; }
-        .bando-content { font-size: 15px; line-height: 1.6; color: #555; }
-        .bando-link { display: inline-block; margin-top: 15px; color: #3498db; text-decoration: none; font-weight: bold; }
-        .bando-link:hover { text-decoration: underline; }
-        .no-data { text-align: center; color: #7f8c8d; font-style: italic; margin-top: 5px; }
-    </style>
-</head>
-<body>
+        /* Reset i estils base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <h1>📢 Bandos de l'Espluga de Francolí</h1>
-    <div id="contenidor-bandos">
-        <p class="no-data">Carregant les darreres notificacions de l'agent diari...</p>
-    </div>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
 
-    <script>
-        async function carregarBandos() {
-            const contenidor = document.getElementById('contenidor-bandos');
-            try {
-                // Llegim el fitxer JSON que actualitza diàriament el nostre agent de Python
-                const resposta = await fetch('noticies.json');
-                if (!resposta.ok) throw new Error("No s'ha trobat el fitxer de dades.");
-                
-                const bandos = await resposta.json();
-                
-                if (bandos.length === 0) {
-                    contenidor.innerHTML = '<p class="no-data">No hi ha cap bando registrat actualment.</p>';
-                    return;
-                }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
 
-                contenidor.innerHTML = ''; // Netejar missatge de càrrega
-                
-                // Els mostrem ordenats del més nou al més antic
-                bandos.reverse().forEach(bando => {
-                    const card = document.createElement('div');
-                    card.className = 'bando-card';
-                    card.innerHTML = `
-                        <h2 class="bando-title">${bando.title}</h2>
-                        <div class="bando-date">Publicat el: ${bando.pubDate}</div>
-                        <div class="bando-content">${bando.content}</div>
-                        <a href="${bando.link}" target="_blank" class="bando-link">Veure a l'eBando original →</a>
-                    `;
-                    contenidor.appendChild(card);
-                });
+        /* Capçalera */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
 
-            } catch (error) {
-                console.error(error);
-                contenidor.innerHTML = '<p class="no-data" style="color:red;">Error de l\'agent: Encara s\'ha d\'executar el programa de Python per primera vegada per generar les dades.</p>';
+        .header h1 {
+            font-size: 2.2rem;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 1rem;
+            color: #666;
+        }
+
+        .header .last-update {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 15px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 8px;
+        }
+
+        /* Estats de càrrega */
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .loading .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px 20px;
+            color: #e74c3c;
+        }
+
+        .error .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        /* Llista de notícies */
+        .noticies-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .noticia-item {
+            background: white;
+            border-radius: 12px;
+            padding: 20px 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease;
+            border-left: 4px solid #667eea;
+        }
+
+        .noticia-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        }
+
+        .noticia-item .title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .noticia-item .title a {
+            color: #333;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .noticia-item .title a:hover {
+            color: #667eea;
+        }
+
+        .noticia-item .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .noticia-item .meta .date {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .noticia-item .meta .date::before {
+            content: "📅";
+        }
+
+        .noticia-item .summary {
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .noticia-item .read-more {
+            display: inline-block;
+            margin-top: 10px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .noticia-item .read-more:hover {
+            color: #764ba2;
+            transform: translateX(3px);
+        }
+
+        /* Comptador */
+        .counter {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .counter strong {
+            color: #667eea;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px;
+                border-radius: 15px;
+            }
+
+            .header h1 {
+                font-size: 1.6rem;
+            }
+
+            .noticia-item {
+                padding: 15px 18px;
+            }
+
+            .noticia-item .title {
+                font-size: 1.05rem;
+            }
+
+            .noticia-item .meta {
+                font-size: 0.75rem;
+                gap: 8px;
             }
         }
 
-        // Executar la funció en obrir la pàgina
-        carregarBandos();
-    </script>
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
 
+            .container {
+                padding: 15px 10px;
+                border-radius: 10px;
+            }
+
+            .header h1 {
+                font-size: 1.3rem;
+            }
+
+            .noticia-item {
+                padding: 12px 14px;
+            }
+        }
+
+        /* Animació d'entrada */
+        .noticia-item {
+            animation: fadeInUp 0.5s ease forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .noticia-item:nth-child(1) { animation-delay: 0.05s; }
+        .noticia-item:nth-child(2) { animation-delay: 0.10s; }
+        .noticia-item:nth-child(3) { animation-delay: 0.15s; }
+        .noticia-item:nth-child(4) { animation-delay: 0.20s; }
+        .noticia-item:nth-child(5) { animation-delay: 0.25s; }
+        .noticia-item:nth-child(6) { animation-delay: 0.30s; }
+        .noticia-item:nth-child(7) { animation-delay: 0.35s; }
+        .noticia-item:nth-child(8) { animation-delay: 0.40s; }
+        .noticia-item:nth-child(9) { animation-delay: 0.45s; }
+        .noticia-item:nth-child(10) { animation-delay: 0.50s; }
+        .noticia-item:nth-child(11) { animation-delay: 0.55s; }
+        .noticia-item:nth-child(12) { animation-delay: 0.60s; }
+        .noticia-item:nth-child(13) { animation-delay: 0.65s; }
+        .noticia-item:nth-child(14) { animation-delay: 0.70s; }
+        .noticia-item:nth-child(15) { animation-delay: 0.75s; }
+        .noticia-item:nth-child(16) { animation-delay: 0.80s; }
+        .noticia-item:nth-child(17) { animation-delay: 0.85s; }
+        .noticia-item:nth-child(18) { animation-delay: 0.90s; }
+        .noticia-item:nth-child(19) { animation-delay: 0.95s; }
+        .noticia-item:nth-child(20) { animation-delay: 1.00s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Capçalera -->
+        <div class="header">
+            <h1>🏛️ Actualitat Municipal</h1>
+            <div class="subtitle">Esplugues de Francolí</div>
+            <span class="badge">📢 Avisos oficials</span>
+            <div class="last-update" id="lastUpdate">Carregant...</div>
+        </div>
+
+        <!-- Contingut -->
+        <div id="content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Carregant les notícies...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const contentElement = document.getElementById('content');
+            const lastUpdateElement = document.getElementById('lastUpdate');
+
+            // Funció per formatar data en català
+            function formatDate(dateString) {
+                if (!dateString) return 'Data desconeguda';
+                
+                try {
+                    const date = new Date(dateString);
+                    if (isNaN(date.getTime())) return dateString;
+                    
+                    const options = {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: 'Europe/Madrid'
+                    };
+                    return date.toLocaleDateString('ca-ES', options);
+                } catch (e) {
+                    return dateString;
+                }
+            }
+
+            // Funció per extreure text d'un resum HTML
+            function extractTextFromHTML(html) {
+                if (!html) return '';
+                const temp = document.createElement('div');
+                temp.innerHTML = html;
+                return temp.textContent || temp.innerText || '';
+            }
+
+            // Funció per mostrar les notícies
+            function renderNoticies(noticies) {
+                if (!noticies || noticies.length === 0) {
+                    contentElement.innerHTML = `
+                        <div class="no-data">
+                            <div style="font-size: 3rem; margin-bottom: 15px;">📭</div>
+                            <p>No hi ha notícies disponibles en aquest moment.</p>
+                        </div>
+                    `;
+                    lastUpdateElement.textContent = 'Sense dades';
+                    return;
+                }
+
+                // Ordenar per data de publicació (més recent primer)
+                const sorted = [...noticies].sort((a, b) => {
+                    if (!a.published) return 1;
+                    if (!b.published) return -1;
+                    return new Date(b.published) - new Date(a.published);
+                });
+
+                let html = '<div class="noticies-list">';
+                
+                sorted.forEach((noticia, index) => {
+                    const title = noticia.title || 'Sense títol';
+                    const link = noticia.link || '#';
+                    const published = formatDate(noticia.published);
+                    const summary = extractTextFromHTML(noticia.summary || '');
+                    
+                    // Limitar resum a 250 caràcters
+                    const shortSummary = summary.length > 250 ? summary.substring(0, 250) + '...' : summary;
+                    
+                    html += `
+                        <div class="noticia-item">
+                            <div class="title">
+                                <a href="${link}" target="_blank" rel="noopener noreferrer">
+                                    ${title}
+                                </a>
+                            </div>
+                            <div class="meta">
+                                <span class="date">${published}</span>
+                            </div>
+                            ${shortSummary ? `<div class="summary">${shortSummary}</div>` : ''}
+                            <a href="${link}" target="_blank" rel="noopener noreferrer" class="read-more">
+                                Llegir més →
+                            </a>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                
+                // Afegir comptador
+                html += `
+                    <div class="counter">
+                        Mostrant <strong>${sorted.length}</strong> notícies
+                    </div>
+                `;
+
+                contentElement.innerHTML = html;
+
+                // Actualizar última actualització
+                const latest = sorted[0];
+                if (latest && latest.fetched_at) {
+                    const fetchedDate = formatDate(latest.fetched_at);
+                    lastUpdateElement.textContent = `Última actualització: ${fetchedDate}`;
+                } else {
+                    lastUpdateElement.textContent = `Última actualització: ${new Date().toLocaleString('ca-ES')}`;
+                }
+            }
+
+            // Funció per mostrar error
+            function showError(message) {
+                contentElement.innerHTML = `
+                    <div class="error">
+                        <div class="icon">⚠️</div>
+                        <p>${message || 'No s\'han pogut carregar les notícies.'}</p>
+                        <p style="margin-top: 10px; font-size: 0.9rem;">
+                            <button onclick="location.reload()" style="
+                                background: #667eea;
+                                color: white;
+                                border: none;
+                                padding: 8px 20px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 0.9rem;
+                            ">
+                                🔄 Reintentar
+                            </button>
+                        </p>
+                    </div>
+                `;
+                lastUpdateElement.textContent = 'Error carregant dades';
+            }
+
+            // Funció principal per carregar dades
+            async function loadData() {
+                try {
+                    const response = await fetch('noticies.json', {
+                        headers: {
+                            'Cache-Control': 'no-cache',
+                            'Pragma': 'no-cache'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            showError('No s\'ha trobat el fitxer de dades. Potser l\'agent encara no s\'ha executat.');
+                        } else {
+                            showError(`Error ${response.status}: ${response.statusText}`);
+                        }
+                        return;
+                    }
+
+                    const data = await response.json();
+                    
+                    if (!Array.isArray(data) || data.length === 0) {
+                        renderNoticies([]);
+                        return;
+                    }
+
+                    renderNoticies(data);
+
+                } catch (error) {
+                    console.error('Error carregant dades:', error);
+                    showError('Error de connexió. Si us plau, intenta-ho més tard.');
+                }
+            }
+
+            // Carregar dades inicials
+            loadData();
+
+            // Recarregar automàticament cada 5 minuts (per si hi ha actualitzacions)
+            setInterval(loadData, 5 * 60 * 1000);
+
+        })();
+    </script>
 </body>
 </html>
