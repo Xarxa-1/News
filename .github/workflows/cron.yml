@@ -20,8 +20,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Job principal: actualitzar dades i desplegar
-  update-and-deploy:
+  # Job 1: Actualitzar dades
+  update-data:
     runs-on: ubuntu-latest
     
     steps:
@@ -31,12 +31,11 @@ jobs:
       with:
         fetch-depth: 1
     
-    # 2. Configurar Python (sense cache per evitar l'error)
+    # 2. Configurar Python
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        # Eliminem el cache perquè no tenim requirements.txt
     
     # 3. Instal·lar dependències
     - name: Instal·lar dependències
@@ -90,7 +89,17 @@ jobs:
       uses: actions/upload-pages-artifact@v3
       with:
         path: .
+
+  # Job 2: Desplegar a GitHub Pages (SEPARAT)
+  deploy:
+    runs-on: ubuntu-latest
+    needs: update-data  # Espera que el primer job acabi
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
-    # 9. Desplegar a GitHub Pages
+    steps:
+    # 1. Desplegar a GitHub Pages
     - name: Desplegar a GitHub Pages
+      id: deployment
       uses: actions/deploy-pages@v4
