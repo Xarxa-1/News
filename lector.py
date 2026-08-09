@@ -1,24 +1,52 @@
+import urllib.request
 import feedparser
 import json
 import os
+import sys
 
 URL_RSS = "https://app.ebando.es/api/v1/rss/esplugadefrancoli"
 FITXER_JSON = "noticies.json"
 
-# 1. Descarregar i analitzar el canal RSS
-feed = feedparser.parse(URL_RSS)
+print(f"Iniciant la connexió a: {URL_RSS}")
 
-# 2. Carregar la base de dades JSON si ja existeix
+req = urllib.request.Request(
+    URL_RSS, 
+    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+)
+
+try:
+    with urllib.request.urlopen(req, timeout=15) as response:
+        contingut_rss = response.read()
+    print("✓ Connexió establerta i dades descarregades correctament.")
+    
+    feed = feedparser.parse(contingut_rss)
+    print(f"✓ RSS analitzat. S'han trobat {len(feed.entries)} entrades disponibles.")
+    
+except urllib.error.HTTPError as e:
+    print(f"❌ Error de servidor (HTTP {e.code}): {e.reason}", file=sys.stderr)
+    sys.exit(1)
+except urllib.error.URLError as e:
+    print(f"❌ Error de xarxa o timeout: {e.reason}", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"❌ Error inesperat en descarregar: {e}", file=sys.stderr)
+    sys.exit(1)
+
+# Llegir base de dades existent
 if os.path.exists(FITXER_JSON):
     with open(FITXER_JSON, "r", encoding="utf-8") as f:
-        noticies_guardades = json.load(f)
+        try:
+            noticies_guardades = json.load(f)
+            if not isinstance(noticies_guardades, list):
+                noticies_guardades = []
+        except json.JSONDecodeError:
+            noticies_guardades = []
 else:
     noticies_guardades = []
 
-# Guardem els ID per no repetir bandos
 guids_existents = {n["guid"] for n in noticies_guardades}
+nous_comptats = 0
 
-# 3. Recórrer els bandos
 for entrada in feed.entries:
     if entrada.guid not in guids_existents:
         contingut_html = ""
@@ -35,9 +63,10 @@ for entrada in feed.entries:
             "content": contingut_html
         }
         noticies_guardades.append(nou_bando)
+        nous_comptats += 1
 
-# 4. Desar la base de dades JSON
 with open(FITXER_JSON, "w", encoding="utf-8") as f:
     json.dump(noticies_guardades, f, ensure_ascii=False, indent=4)
 
-print(f"Procés finalitzat. Total de bandos: {len(noticies_guardades)}")
+print(f"✓ Base de dades actualitzada. Nous bandos afegits: {nous_comptats}")
+print(f"Total acumulats: {len(noticies_guardades)}")
