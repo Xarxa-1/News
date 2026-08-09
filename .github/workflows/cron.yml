@@ -1,9 +1,9 @@
 name: Agent d'Actualitat Municipal
 
 on:
-  # Execució programada: cada dia a les 09:00 UTC
-  schedule:
-    - cron: '0 9 * * *'
+  # Execució programada: 15 minuts
+schedule:
+  - cron: '*/15 * * * *'
   
   # Permet executar manualment des de la interfície de GitHub
   workflow_dispatch:
@@ -90,10 +90,10 @@ jobs:
       with:
         path: .
 
-  # Job 2: Desplegar a GitHub Pages (SEPARAT)
+  # Job 2: Desplegar a GitHub Pages
   deploy:
     runs-on: ubuntu-latest
-    needs: update-data  # Espera que el primer job acabi
+    needs: update-data
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
