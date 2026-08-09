@@ -1,48 +1,96 @@
-name: Execució Diària eBando Espluga
+name: Agent d'Actualitat Municipal
 
 on:
+  # Execució programada: cada dia a les 09:00 UTC
   schedule:
-    - cron: '0 9 * * *'  # S'executa automàticament cada dia a les 09:00 UTC
-  workflow_dispatch:     # Activa el botó per provar-ho manualment a la web de GitHub
+    - cron: '0 9 * * *'
+  
+  # Permet executar manualment des de la interfície de GitHub
+  workflow_dispatch:
 
+# Permisos necessaris per a Pages
 permissions:
-  contents: write        # Permís obligatori per guardar les noves notícies al JSON
-  pages: write           # Permís per poder publicar la pàgina web gratis
+  contents: write
+  pages: write
   id-token: write
 
+# Evitar execucions concurrents per mantenir l'històric net
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  run-agent:
+  # Job principal: actualitzar dades i desplegar
+  update-and-deploy:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Baixar el codi del repositori
-        uses: actions/checkout@v4
-
-      - name: Configurar entorn Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Instal·lar llibreria Feedparser
-        run: pip install feedparser
-
-      - name: Executar l'agent de l'eBando
-        run: python agent.py
-
-      - name: Guardar canvis del JSON al repositori
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add noticies.json || true
-          git commit -m "Actualització automàtica de bandos (JSON)" || true
-          git push || true
-
-      - name: Configurar GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Preparar fitxers per a la web
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'      # Puja l'index.html i el noticies.json a la teva adreça pública
-
-      - name: Publicar la pàgina web a Internet
-        uses: actions/deploy-pages@v4
+    # 1. Clonar el repositori
+    - name: Clonar repositori
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+    
+    # 2. Configurar Python
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    # 3. Instal·lar dependències
+    - name: Instal·lar dependències
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests feedparser
+    
+    # 4. Executar l'agent Python
+    - name: Executar agent
+      run: python agent.py
+      env:
+        PYTHONUNBUFFERED: 1
+    
+    # 5. Verificar que s'ha generat el fitxer
+    - name: Verificar noticies.json
+      run: |
+        if [ -f "noticies.json" ]; then
+          echo "✅ noticies.json generat correctament"
+          cat noticies.json | python -m json.tool > /dev/null && echo "✅ JSON vàlid" || echo "⚠️ JSON invàlid"
+          echo "📊 Nombre de notícies: $(python -c 'import json; print(len(json.load(open(\"noticies.json\"))))')"
+        else
+          echo "❌ No s'ha generat noticies.json"
+          exit 1
+        fi
+    
+    # 6. Configurar Git
+    - name: Configurar Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+    # 7. Commitar i pujar canvis
+    - name: Commitar i pujar canvis
+      run: |
+        # Afegir el fitxer JSON
+        git add noticies.json
+        
+        # Verificar si hi ha canvis
+        if git diff --staged --quiet; then
+          echo "✅ No hi ha canvis per commitar"
+        else
+          # Crear commit amb timestamp
+          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          git commit -m "🤖 Actualitzar notícies: ${TIMESTAMP}"
+          git push origin HEAD:main
+          echo "✅ Canvis pujats al repositori"
+        fi
+    
+    # 8. Pujar l'artefacte per a Pages
+    - name: Pujar artefacte de Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: .
+    
+    # 9. Desplegar a GitHub Pages
+    - name: Desplegar a GitHub Pages
+      uses: actions/deploy-pages@v4
