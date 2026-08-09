@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+""" 
 Agent d'actualitat municipal per Esplugues de Francolí
 Recull notícies de l'RSS oficial i les guarda en format JSON
 """
