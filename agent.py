@@ -3,7 +3,7 @@ import feedparser
 import json
 import os
 
-URL_RSS = "https://ebando.es"
+URL_RSS = "https://app.ebando.es/api/v1/rss/esplugadefrancoli"
 FITXER_JSON = "noticies.json"
 
 print(f"Descarregant dades de l'eBando: {URL_RSS}")
