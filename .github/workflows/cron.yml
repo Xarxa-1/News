@@ -31,12 +31,12 @@ jobs:
       with:
         fetch-depth: 1
     
-    # 2. Configurar Python
+    # 2. Configurar Python (sense cache per evitar l'error)
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        cache: 'pip'
+        # Eliminem el cache perquè no tenim requirements.txt
     
     # 3. Instal·lar dependències
     - name: Instal·lar dependències
