@@ -1,65 +1,50 @@
-import urllib.request
-import feedparser
-import json
-import os
+name: Execució Diària eBando Espluga
 
-URL_RSS = "https://app.ebando.es/api/v1/rss/esplugadefrancoli"
-FITXER_JSON = "noticies.json"
+on:
+  schedule:
+    - cron: '0 9 * * *'  # S'executa cada dia a les 09:00 UTC
+  workflow_dispatch:     # Permet provar-ho manualment amb el botó "Run workflow"
 
-print(f"Descarregant dades de l'eBando: {URL_RSS}")
+permissions:
+  contents: write        # Permet que l'script guardi el fitxer noticies.json al repositori
+  pages: write           # Permet activar GitHub Pages
+  id-token: write
 
-# Forçar la capçalera de navegador per seguretat contra bloquejos
-req = urllib.request.Request(
-    URL_RSS, 
-    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-)
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar el codi del repositori
+        uses: actions/checkout@v4
 
-try:
-    with urllib.request.urlopen(req, timeout=20) as response:
-        contingut_rss = response.read()
-    feed = feedparser.parse(contingut_rss)
-    print(f"RSS llegit. S'han detectat {len(feed.entries)} entrades.")
-except Exception as e:
-    print(f"Avís: No s'ha pogut baixar l'RSS actual: {e}")
-    feed = None
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-# Llegir base de dades existent de manera segura
-noticies_guardades = []
-if os.path.exists(FITXER_JSON):
-    try:
-        with open(FITXER_JSON, "r", encoding="utf-8") as f:
-            noticies_guardades = json.load(f)
-            if not isinstance(noticies_guardades, list):
-                noticies_guardades = []
-    except Exception:
-        print("El fitxer JSON antic estava buit o corrupte. Es reiniciarà de zero.")
-        noticies_guardades = []
+      - name: Instal·lar llibreries de Python
+        run: pip install feedparser
 
-guids_existents = {n["guid"] for n in noticies_guardades if "guid" in n}
+      - name: Executar l'agent de l'eBando
+        run: python agent.py  # Assegura't que el teu fitxer de Python es diu exactament així
 
-# Integrar les noves entrades trobades
-nous_comptats = 0
-if feed and feed.entries:
-    for entrada in feed.entries:
-        if getattr(entrada, "guid", None) and entrada.guid not in guids_existents:
-            contingut_html = ""
-            if "content" in entrada:
-                contingut_html = entrada.content.value
-            elif "summary" in entrada:
-                contingut_html = entrada.summary
+      # DESA ELS CANVIS DE LES NOTÍCIES AL TEU GITHUB
+      - name: Guardar noticies.json al repositori
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add noticias.json || true
+          git commit -m "Actualització automàtica de bandos (JSON)" || true
+          git push || true
 
-            nou_bando = {
-                "guid": entrada.guid,
-                "title": entrada.title,
-                "pubDate": getattr(entrada, "published", "Sense data"),
-                "link": entrada.link,
-                "content": contingut_html
-            }
-            noticies_guardades.append(nou_bando)
-            nous_comptats += 1
+      # ENVIAMENT A LA WEB PÚBLICA
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
 
-# Desar la base de dades actualitzada a l'arrel
-with open(FITXER_JSON, "w", encoding="utf-8") as f:
-    json.dump(noticies_guardades, f, ensure_ascii=False, indent=4)
+      - name: Pujar fitxers a internet
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'      # Això publica l'index.html i el noticies.json a la teva URL pública
 
-print(f"Procés completat. Nous bandos afegits: {nous_comptats}. Total: {len(noticies_guardades)}")
+      - name: Desplegar el lloc web oficial
+        uses: actions/deploy-pages@v4
