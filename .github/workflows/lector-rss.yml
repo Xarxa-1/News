@@ -2,14 +2,14 @@ name: Actualitzar eBando Diari
 
 on:
   schedule:
-    - cron: '0 * * * *' # S'executa automàticament cada hora (al minut 0)
-  workflow_dispatch: # Permet fer proves i prémer el botó manual
+    - cron: '0 * * * *' # S'executa cada hora
+  workflow_dispatch: # Botó manual
 
 jobs:
   actualitzar:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Dona permís al bot per poder desar el JSON al repositori
+      contents: write # Permís d'escriptura obligatori
     steps:
       - name: Descarregar codi del repositori
         uses: actions/checkout@v4
@@ -17,10 +17,12 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11' # Forcem una versió moderna i estable
 
       - name: Instal·lar llibreria de lectura RSS
-        run: pip install feedparser
+        run: |
+          python -m pip install --upgrade pip
+          pip install feedparser
 
       - name: Executar bot lector
         run: python lector.py
