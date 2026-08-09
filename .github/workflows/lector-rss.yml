@@ -1,0 +1,34 @@
+name: Actualitzar eBando Diari
+
+on:
+  schedule:
+    - cron: '0 * * * *' # S'executa automàticament cada hora (al minut 0)
+  workflow_dispatch: # Permet fer proves i prémer el botó manual
+
+jobs:
+  actualitzar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Dona permís al bot per poder desar el JSON al repositori
+    steps:
+      - name: Descarregar codi del repositori
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Instal·lar llibreria de lectura RSS
+        run: pip install feedparser
+
+      - name: Executar bot lector
+        run: python lector.py
+
+      - name: Desar els canvis a GitHub automàticament
+        run: |
+          git config --global user.name "eBando Bot"
+          git config --global user.email "actions@github.com"
+          git add noticies.json
+          git commit -m "Bandos actualitzats automàticament" || exit 0
+          git push
