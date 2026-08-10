@@ -10,7 +10,7 @@ import json
 import os
 import logging
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Configuració de logging
 logging.basicConfig(
@@ -29,11 +29,10 @@ HEADERS = {
     'Cache-Control': 'no-cache'
 }
 JSON_FILE = "noticies.json"
+MAX_NOTICIES = 200  # 🆕 Límit per evitar que el fitxer creixi indefinidament
 
 def obtenir_noticies_rss() -> List[Dict[str, Any]]:
-    """
-    Obté les notícies de l'RSS amb headers per evitar bloquejos
-    """
+    """Obté les notícies de l'RSS amb headers per evitar bloquejos"""
     try:
         logger.info(f"Descarregant RSS de: {RSS_URL}")
         response = requests.get(RSS_URL, headers=HEADERS, timeout=30)
@@ -43,24 +42,28 @@ def obtenir_noticies_rss() -> List[Dict[str, Any]]:
         feed = feedparser.parse(response.content)
         
         if feed.bozo:
-            logger.warning(f"Problema amb el parseig del RSS: {feed.bozo_exception}")
+            # No tots els errors bozo són crítics
+            logger.warning(f"Problema menor amb el parseig del RSS: {feed.bozo_exception}")
         
         noticies = []
         for entry in feed.entries:
-            # Extreure GUID o utilitzar link com a identificador
-            guid = entry.get('guid', entry.get('link', ''))
+            # 🆕 Millor generació de GUID
+            guid = entry.get('guid', '')
             if not guid:
-                continue
-                
+                # Fallback: link + title com a identificador compost
+                guid = f"{entry.get('link', '')}_{entry.get('title', '')}"
+                if not guid or guid == "_":
+                    continue
+            
             # Extreure data de publicació
             published = entry.get('published', entry.get('pubDate', ''))
             if published:
                 try:
-                    # Convertir a format ISO si és possible
                     from email.utils import parsedate_to_datetime
                     pub_date = parsedate_to_datetime(published)
                     published_iso = pub_date.isoformat()
-                except:
+                except (ValueError, TypeError):
+                    # Si no es pot parsejar, guardar com a text
                     published_iso = published
             else:
                 published_iso = datetime.now().isoformat()
@@ -86,9 +89,7 @@ def obtenir_noticies_rss() -> List[Dict[str, Any]]:
         return []
 
 def carregar_noticies_existents() -> List[Dict[str, Any]]:
-    """
-    Carrega les notícies existents del fitxer JSON
-    """
+    """Carrega les notícies existents del fitxer JSON"""
     if os.path.exists(JSON_FILE):
         try:
             with open(JSON_FILE, 'r', encoding='utf-8') as f:
@@ -102,12 +103,15 @@ def carregar_noticies_existents() -> List[Dict[str, Any]]:
     return []
 
 def guardar_noticies(noticies: List[Dict[str, Any]]) -> bool:
-    """
-    Guarda les notícies al fitxer JSON
-    """
+    """Guarda les notícies al fitxer JSON"""
     try:
         # Ordenar per data de publicació (més recent primer)
         noticies.sort(key=lambda x: x.get('published', ''), reverse=True)
+        
+        # 🆕 Limitar el nombre de notícies
+        if len(noticies) > MAX_NOTICIES:
+            logger.info(f"Truncant notícies de {len(noticies)} a {MAX_NOTICIES}")
+            noticies = noticies[:MAX_NOTICIES]
         
         with open(JSON_FILE, 'w', encoding='utf-8') as f:
             json.dump(noticies, f, ensure_ascii=False, indent=2)
@@ -118,14 +122,17 @@ def guardar_noticies(noticies: List[Dict[str, Any]]) -> bool:
         logger.error(f"Error guardant {JSON_FILE}: {e}")
         return False
 
-def actualitzar_noticies() -> None:
-    """
-    Funció principal: obté notícies noves i actualitza el fitxer JSON
-    """
-    # Carregar notícies existents
-    noticies_existents = carregar_noticies_existents()
-    guids_existents = {n.get('guid') for n in noticies_existents if n.get('guid')}
-    logger.info(f"Carregades {len(noticies_existents)} notícies existents")
+def actualitzar_noticies(force: bool = False) -> None:
+    """Funció principal: obté notícies noves i actualitza el fitxer JSON"""
+    # 🆕 Paràmetre force per recarregar totes les notícies
+    if force:
+        noticies_existents = []
+        guids_existents = set()
+        logger.info("Mode FORCE: recarregant totes les notícies")
+    else:
+        noticies_existents = carregar_noticies_existents()
+        guids_existents = {n.get('guid') for n in noticies_existents if n.get('guid')}
+        logger.info(f"Carregades {len(noticies_existents)} notícies existents")
     
     # Obtenir noves notícies
     noves_noticies = obtenir_noticies_rss()
